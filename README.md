@@ -1,7 +1,7 @@
-atmospheric-physics-ai
+leash-bio-ai
 ==============================
 
-Project dedicated towards competing in the Leap Atmospheric Physics competition on kaggle.
+Project dedicated towards competing in the "Leash Bio - Predict New Medicines with BELKA" competition on kaggle.
 
 Project Organization
 ------------
