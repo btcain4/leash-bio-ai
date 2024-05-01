@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "atmospheric-physics-ai"
+name = "leash-bio-ai"
 version = "0.1.0"
 description = ""
 authors = ["Your Name <you@example.com>"]
