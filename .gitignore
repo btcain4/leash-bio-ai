@@ -93,3 +93,6 @@ target/
 
 # virtual enviornment
 .venv
+
+# configuration file with potential personal details
+conf.py
