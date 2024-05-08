@@ -1,4 +1,6 @@
 # Data directories
-train_dir = ""  # Directory location of training data
-test_dir = ""  # Directory location of testing data
-sample_submission_dir = ""  # Directory location of sample submission
+train_dir = bronze_train_dir = ""  # Directory location of training data (bronze)
+test_dir = bronze_test_dir = ""  # Directory location of testing data (bronze)
+sample_submission_dir = bronze_sample_submission_dir = (
+    ""  # Directory location of sample submission (bronze)
+)
