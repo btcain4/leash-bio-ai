@@ -4,11 +4,18 @@ import logging
 
 
 class PolarsPipeline(ABC):
+    """Abstract class to provide structure for polar pipeline classes
+
+    Attributes:
+        df (polars dataframe or lazyframe): result of dataframe() abstract method
+        logger_file (str): string specifying location of desired logging file
+        logger (obj): logger resultant from setup_logger() method
+    """
 
     def __init__(self, logger_file):
-        self.df = dataframe()
+        self.df = self.dataframe()
         self.logger_file = logger_file
-        self.logger = setup_logger()
+        self.logger = self.setup_logger()
 
     @abstractmethod
     def dataframe(self):
