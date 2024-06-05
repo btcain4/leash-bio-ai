@@ -96,3 +96,6 @@ target/
 
 # configuration file with potential personal details
 conf.py
+
+# exclude logs from version control
+/logs/
