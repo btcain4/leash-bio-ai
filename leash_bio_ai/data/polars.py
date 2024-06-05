@@ -1,3 +1,4 @@
+from leash_bio_ai.utils import conf
 from abc import ABC, abstractmethod
 import polars as pl
 import logging
@@ -7,13 +8,13 @@ class PolarsPipeline(ABC):
     """Abstract class to provide structure for polar pipeline classes
 
     Attributes:
-        df (polars dataframe or lazyframe): result of dataframe() abstract method
+        conf ():
         logger_file (str): string specifying location of desired logging file
         logger (obj): logger resultant from setup_logger() method
     """
 
     def __init__(self, logger_file):
-        self.df = self.dataframe()
+        self.conf = conf
         self.logger_file = logger_file
         self.logger = self.setup_logger()
 
