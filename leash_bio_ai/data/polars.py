@@ -4,17 +4,21 @@ import polars as pl
 import logging
 
 
+class PipelineError(Exception):
+    """raise this exception for errors in data pipelines"""
+
+    pass
+
+
 class PolarsPipeline(ABC):
     """Abstract class to provide structure for polar pipeline classes
 
     Attributes:
-        conf ():
         logger_file (str): string specifying location of desired logging file
         logger (obj): logger resultant from setup_logger() method
     """
 
     def __init__(self, logger_file):
-        self.conf = conf
         self.logger_file = logger_file
         self.logger = self.setup_logger()
 
