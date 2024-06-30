@@ -1,4 +1,5 @@
 import polars as pl
+import numpy as np
 
 from leash_bio_ai.utils.conf import silver_logger_file
 from leash_bio_ai.utils.conf import data_dir, bronze_train_dir, bronze_test_dir
@@ -9,11 +10,20 @@ def df_sampler(df, proportion):
     """Returns a sample of a polars dataframes rows without replacement.
 
     Args:
-        df (polars dataframe): dataframe to return a sample of.
+        df (polars lazyframe): dataframe to return a sample of.
         proportion (float): number between 0 and 1 indicating the proportion of the dataset
                             to be sampled.
     """
-    pass
+
+    df_len = df.select(pl.len()).collect(streaming=True).item()
+    probs = np.random.uniform(low=0, high=0, size=df_len)
+
+    df = df.with_columns(pl.Series(name="probs", values=probs))
+    samp_df = df.filter(pl.col("probs") <= proportion)
+    samp_df = samp_df.drop("probs")
+    samp_df = samp_df.collect(streaming=True)
+
+    return samp_df
 
 
 class SilverPipeline(PolarsPipeline):
