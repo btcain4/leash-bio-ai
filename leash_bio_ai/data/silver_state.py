@@ -16,7 +16,9 @@ def df_sampler(df, proportion):
     """
 
     df_len = df.select(pl.len()).collect(streaming=True).item()
-    probs = np.random.uniform(low=0, high=0, size=df_len)
+
+    np.random.seed(0)  # Replicable result
+    probs = np.random.uniform(low=0, high=1, size=df_len)
 
     df = df.with_columns(pl.Series(name="probs", values=probs))
     samp_df = df.filter(pl.col("probs") <= proportion)
