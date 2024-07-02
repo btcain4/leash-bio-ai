@@ -12,7 +12,7 @@ def df_sampler(df, proportion):
     Args:
         df (polars lazyframe): dataframe to return a sample of.
         proportion (float): number between 0 and 1 indicating the proportion of the dataset
-                            to be sampled.
+                            to be sampled. (Function returns approxiamately this)
     """
 
     df_len = df.select(pl.len()).collect(streaming=True).item()
@@ -35,11 +35,13 @@ class SilverPipeline(PolarsPipeline):
     Attributes:
         bronze_dir (str): string specifying the location of the bronze layer data
         df (polars lazyframe): bronze layer dataframe to be transformed by the pipeline
+        test_set (boolean): indicates if data being processed by the pipeline is the test set
         Check polars.py for attributes inherited from the PolarsPipeline abstract class
     """
 
-    def __init__(self, logger_file, bronze_dir):
+    def __init__(self, logger_file, bronze_dir, test=False):
         super().__init__(logger_file)
+        self.test = test
         self.bronze_dir = bronze_dir
         self.df = self.dataframe()
 
@@ -49,6 +51,7 @@ class SilverPipeline(PolarsPipeline):
 
     def protein_imputation(self):
         """Integer imputation on protein_name column to reduce dataset memory stress on local compute"""
+
         mapper = {"BRD4": 0, "HSA": 1, "sEH": 2}
         self.df = self.df.with_columns(
             protein_int=pl.col("protein_name").replace(mapper)
@@ -56,12 +59,19 @@ class SilverPipeline(PolarsPipeline):
 
     def column_correction(self):
         """Column reduction and integer type correction to reduce dataset size and dataset memory stress on local compute"""
-        self.df = self.df.select(
-            "id",
-            "molecule_smiles",
-            pl.col("protein_int").cast(pl.Int8),
-            pl.col("binds").cast(pl.Int8),
-        )
+
+        if self.test:
+            self.df = self.df.select(
+                "id", "molecule_smiles", pl.col("protein_int").cast(pl.Int8)
+            )
+
+        else:
+            self.df = self.df.select(
+                "id",
+                "molecule_smiles",
+                pl.col("protein_int").cast(pl.Int8),
+                pl.col("binds").cast(pl.Int8),
+            )
 
     def execute(self):
         pass
