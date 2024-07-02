@@ -2,7 +2,8 @@ import polars as pl
 import numpy as np
 
 from leash_bio_ai.utils.conf import silver_logger_file
-from leash_bio_ai.utils.conf import data_dir, bronze_train_dir, bronze_test_dir
+from leash_bio_ai.utils.conf import bronze_train_dir, bronze_test_dir
+from leash_bio_ai.utils.conf import silver_train_dir, silver_test_dir
 from leash_bio_ai.data.polars import PolarsPipeline, PipelineError
 
 
@@ -39,10 +40,11 @@ class SilverPipeline(PolarsPipeline):
         Check polars.py for attributes inherited from the PolarsPipeline abstract class
     """
 
-    def __init__(self, logger_file, bronze_dir, test=False):
+    def __init__(self, logger_file, bronze_dir, silver_dir, test=False):
         super().__init__(logger_file)
         self.test = test
         self.bronze_dir = bronze_dir
+        self.silver_dir = silver_dir
         self.df = self.dataframe()
 
     def dataframe(self):
@@ -74,4 +76,14 @@ class SilverPipeline(PolarsPipeline):
             )
 
     def execute(self):
-        pass
+
+        if self.test:
+
+            self.logger.info("Imputing Protein Names (Test Set)")
+            self.protein_imputation()
+
+            self.logger.info("Performing Column Corrections (Test Set)")
+            self.column_correction()
+
+            self.logger.info("Save to Parquet (Test Set)")
+            self.df.write_parquet(file=self.silver_dir)
