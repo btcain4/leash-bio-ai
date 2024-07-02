@@ -46,6 +46,7 @@ class SilverPipeline(PolarsPipeline):
         self.bronze_dir = bronze_dir
         self.silver_dir = silver_dir
         self.df = self.dataframe()
+        self.df_slices = None
 
     def dataframe(self):
         df = pl.scan_parquet(source=self.bronze_dir)
@@ -75,15 +76,62 @@ class SilverPipeline(PolarsPipeline):
                 pl.col("binds").cast(pl.Int8),
             )
 
+    def slice_df(self):
+
+        df_len = self.df.select(pl.len()).collect(streaming=True).item()
+        df_step = df_len / 10
+
+        slices = np.arange(start=0, stop=df_len, step=df_step)
+
+        for start in slices:
+            (self.df_slices.append(self.df.slice(offset=start, length=df_step)))
+
+    def downsample_slices(self):
+
+        ds_dfs = []
+        for i in range(len(self.df_slices)):
+
+            pos_df = (
+                self.df_slices[i].filter(pl.col("binds") == 1).collect(streaming=True)
+            )
+            neg_df = df_sampler(
+                self.df_slices[i].filter(pl.col("binds") == 0), proportion=0.01
+            )
+            ds_dfs.append(pl.concat(items=[pos_df, neg_df], how="vertical"))
+
+        return pl.concat(items=ds_dfs, how="vertical")
+
     def execute(self):
 
-        if self.test:
+        try:
+            if self.test:
 
-            self.logger.info("Imputing Protein Names (Test Set)")
-            self.protein_imputation()
+                self.logger.info("Imputing Protein Names (Test Set)")
+                self.protein_imputation()
 
-            self.logger.info("Performing Column Corrections (Test Set)")
-            self.column_correction()
+                self.logger.info("Performing Column Corrections (Test Set)")
+                self.column_correction()
 
-            self.logger.info("Save to Parquet (Test Set)")
-            self.df.write_parquet(file=self.silver_dir)
+                self.logger.info("Save to Parquet (Test Set)")
+                self.df.write_parquet(file=self.silver_dir)
+
+            else:
+
+                self.logger.info("Imputing Protein Names (Train Set)")
+                self.protein_imputation()
+
+                self.logger.info("Performing Column Corrections (Train Set)")
+                self.column_correction()
+
+                self.logger.info("Slice Dataframe (Train Set)")
+                self.slice_df()
+
+                self.logger.info("Performing Downsampling (Train Set)")
+                downsampled_df = self.downsample_slices()
+
+                self.logger.info("Save to Parquet (Train Set)")
+                downsampled_df.write_parquet(file=self.silver_dir)
+
+        except:
+            self.logger.info("An error occured in the pipeline")
+            raise PipelineError("An error occured in the pipeline")
