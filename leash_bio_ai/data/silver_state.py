@@ -89,9 +89,6 @@ class SilverPipeline(PolarsPipeline):
         neg_df = df_sampler(self.df.filter(pl.col("binds") == 0), proportion=0.01)
         self.df = pl.concat(items=[pos_df, neg_df], how="vertical")
 
-        del pos_df
-        del neg_df
-
     def save_downsample(self):
 
         if self.slice[0] == 0:
