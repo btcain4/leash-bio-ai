@@ -4,19 +4,19 @@ import numpy as np
 from leash_bio_ai.utils.conf import silver_logger_file
 from leash_bio_ai.utils.conf import bronze_train_dir, bronze_test_dir
 from leash_bio_ai.utils.conf import silver_train_dir, silver_test_dir
-from leash_bio_ai.data.polars import PolarsPipeline, PipelineError
+from leash_bio_ai.data.pipeline import PolarsPipeline, PipelineError
 
 
 def df_sampler(df, proportion):
     """Returns a sample of a polars dataframes rows without replacement.
 
     Args:
-        df (polars lazyframe): dataframe to return a sample of.
+        df (polars dataframe): dataframe to return a sample of.
         proportion (float): number between 0 and 1 indicating the proportion of the dataset
                             to be sampled. (Function returns approxiamately this)
     """
 
-    df_len = df.select(pl.len()).collect(streaming=True).item()
+    df_len = df.select(pl.len()).item()
 
     np.random.seed(0)  # Replicable result
     probs = np.random.uniform(low=0, high=1, size=df_len)
@@ -24,7 +24,7 @@ def df_sampler(df, proportion):
     df = df.with_columns(pl.Series(name="probs", values=probs))
     samp_df = df.filter(pl.col("probs") <= proportion)
     samp_df = samp_df.drop("probs")
-    samp_df = samp_df.collect(streaming=True)
+    samp_df = samp_df
 
     return samp_df
 
@@ -40,16 +40,23 @@ class SilverPipeline(PolarsPipeline):
         Check polars.py for attributes inherited from the PolarsPipeline abstract class
     """
 
-    def __init__(self, logger_file, bronze_dir, silver_dir, test=False):
+    def __init__(self, logger_file, bronze_dir, silver_dir, slice=None, test=False):
         super().__init__(logger_file)
         self.test = test
         self.bronze_dir = bronze_dir
         self.silver_dir = silver_dir
+        self.slice = slice
         self.df = self.dataframe()
-        self.df_slices = None
 
     def dataframe(self):
-        df = pl.scan_parquet(source=self.bronze_dir)
+        if self.test:
+            df = pl.scan_parquet(source=self.bronze_dir)
+        else:
+            df = pl.scan_parquet(source=self.bronze_dir, low_memory=True)
+            df = df.filter(pl.col("id") >= self.slice[0])
+            df = df.filter(pl.col("id") <= self.slice[1])
+            df = df.collect(streaming=True)
+
         return df
 
     def protein_imputation(self):
@@ -76,30 +83,23 @@ class SilverPipeline(PolarsPipeline):
                 pl.col("binds").cast(pl.Int8),
             )
 
-    def slice_df(self):
+    def downsample(self):
 
-        df_len = self.df.select(pl.len()).collect(streaming=True).item()
-        df_step = df_len / 10
+        pos_df = self.df.filter(pl.col("binds") == 1)
+        neg_df = df_sampler(self.df.filter(pl.col("binds") == 0), proportion=0.01)
+        self.df = pl.concat(items=[pos_df, neg_df], how="vertical")
 
-        slices = np.arange(start=0, stop=df_len, step=df_step)
+        del pos_df
+        del neg_df
 
-        for start in slices:
-            (self.df_slices.append(self.df.slice(offset=start, length=df_step)))
+    def save_downsample(self):
 
-    def downsample_slices(self):
-
-        ds_dfs = []
-        for i in range(len(self.df_slices)):
-
-            pos_df = (
-                self.df_slices[i].filter(pl.col("binds") == 1).collect(streaming=True)
-            )
-            neg_df = df_sampler(
-                self.df_slices[i].filter(pl.col("binds") == 0), proportion=0.01
-            )
-            ds_dfs.append(pl.concat(items=[pos_df, neg_df], how="vertical"))
-
-        return pl.concat(items=ds_dfs, how="vertical")
+        if self.slice[0] == 0:
+            self.df.write_parquet(file=self.silver_dir)
+        else:
+            silver_df = pl.read_parquet(source=self.silver_dir)
+            self.df = pl.concat(items=[silver_df, self.df], how="vertical")
+            self.df.write_parquet(file=self.silver_dir)
 
     def execute(self):
 
@@ -113,7 +113,9 @@ class SilverPipeline(PolarsPipeline):
                 self.column_correction()
 
                 self.logger.info("Save to Parquet (Test Set)")
-                self.df.write_parquet(file=self.silver_dir)
+                self.df.collect().write_parquet(file=self.silver_dir)
+
+                self.logger.info("Silver Test Set Generated")
 
             else:
 
@@ -123,15 +125,40 @@ class SilverPipeline(PolarsPipeline):
                 self.logger.info("Performing Column Corrections (Train Set)")
                 self.column_correction()
 
-                self.logger.info("Slice Dataframe (Train Set)")
-                self.slice_df()
-
-                self.logger.info("Performing Downsampling (Train Set)")
-                downsampled_df = self.downsample_slices()
+                self.logger.info("Downsampling Negative Binds (Train Set)")
+                self.downsample()
 
                 self.logger.info("Save to Parquet (Train Set)")
-                downsampled_df.write_parquet(file=self.silver_dir)
+                self.save_downsample()
+
+                self.logger.info(f"{self.slice} Silver Train Set Generated")
 
         except:
             self.logger.info("An error occured in the pipeline")
             raise PipelineError("An error occured in the pipeline")
+
+
+if __name__ == "__main__":
+
+    otestSilverPipeline = SilverPipeline(
+        logger_file=silver_logger_file,
+        bronze_dir=bronze_test_dir,
+        silver_dir=silver_test_dir,
+        test=True,
+    )
+    otestSilverPipeline.execute()
+    del otestSilverPipeline
+
+    ## Batch process training set into 30 different sets
+    slices = np.arange(start=0, stop=295246830, step=9841561)
+    for slice in slices:
+
+        otrainSilverPipeline = SilverPipeline(
+            logger_file=silver_logger_file,
+            bronze_dir=bronze_train_dir,
+            silver_dir=silver_train_dir,
+            slice=[slice, slice + 9841561],
+            test=False,
+        )
+        otrainSilverPipeline.execute()
+        del otrainSilverPipeline
