@@ -137,3 +137,24 @@ class GoldPipeline(PolarsPipeline):
             except:
                 self.logger.info("An error occured in the pipeline")
                 raise PipelineError("An error occured in the pipeline")
+
+
+if __name__ == "__main__":
+
+    otestGoldPipeline = GoldPipeline(
+        logger_file=gold_logger_file,
+        silver_dir=silver_test_dir,
+        gold_dir=gold_test_dir,
+        gold_features=gold_features,
+        test=True,
+    )
+    del otestGoldPipeline
+
+    otrainGoldPipeline = GoldPipeline(
+        logger_file=gold_logger_file,
+        silver_dir=silver_train_dir,
+        gold_dir=gold_train_dir,
+        gold_features=gold_features,
+        test=False,
+    )
+    del otrainGoldPipeline
