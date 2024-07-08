@@ -146,6 +146,7 @@ if __name__ == "__main__":
         gold_features=gold_features,
         test=True,
     )
+    otestGoldPipeline.execute()
     del otestGoldPipeline
 
     otrainGoldPipeline = GoldPipeline(
@@ -155,4 +156,5 @@ if __name__ == "__main__":
         gold_features=gold_features,
         test=False,
     )
+    otrainGoldPipeline.execute()
     del otrainGoldPipeline
